@@ -21,9 +21,9 @@ const app = (0, express_1.default)();
 const port = process.env.PORT;
 app.use(express_1.default.json());
 app.post('/user', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let { userName, email, password } = req.body;
-    let money = 1000;
-    const post = yield prisma.user.create({
+    const { userName, email, password } = req.body;
+    const money = 1000;
+    const user = yield prisma.user.create({
         data: {
             userName,
             email,
@@ -31,7 +31,16 @@ app.post('/user', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             money,
         }
     });
-    res.json(post);
+    res.json(user);
+}));
+app.delete('/user/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const user = yield prisma.user.delete({
+        where: {
+            id,
+        }
+    });
+    res.json(user);
 }));
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);

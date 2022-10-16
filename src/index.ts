@@ -4,16 +4,16 @@ import { PrismaClient } from '@prisma/client'
 
 dotenv.config();
 
-const prisma = new PrismaClient()
+const prisma: PrismaClient = new PrismaClient()
 const app: Express = express();
 const port = process.env.PORT;
 
 app.use(express.json());
 
 app.post('/user', async (req: Request, res:Response) => {
-    let {userName, email, password} = req.body;
-    let money = 1000;
-    const post = await prisma.user.create({
+    const {userName, email, password} = req.body;
+    const money = 1000;
+    const user = await prisma.user.create({
         data: {
             userName,
             email,
@@ -21,7 +21,17 @@ app.post('/user', async (req: Request, res:Response) => {
             money,
         }
     })
-    res.json(post)
+    res.json(user)
+})
+
+app.delete('/user/:id', async (req:Request, res:Response) => {
+    const {id} = req.params;
+    const user = await prisma.user.delete({
+        where: {
+            id,
+        }
+    })
+    res.json(user)
 })
 
 app.listen(port, () => {
