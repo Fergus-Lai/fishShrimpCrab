@@ -24,6 +24,16 @@ app.post('/user', async (req: Request, res:Response) => {
     res.json(user)
 })
 
+app.get('/user/:id', async (req:Request, res:Response) => {
+    const {id} = req.params;
+    const user = await prisma.user.findUnique({
+        where: {
+            id,
+        }
+    })
+    res.json(user)
+})
+
 app.delete('/user/:id', async (req:Request, res:Response) => {
     const {id} = req.params;
     const user = await prisma.user.delete({

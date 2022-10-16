@@ -33,6 +33,15 @@ app.post('/user', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     });
     res.json(user);
 }));
+app.get('/user/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const user = yield prisma.user.findUnique({
+        where: {
+            id,
+        }
+    });
+    res.json(user);
+}));
 app.delete('/user/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const user = yield prisma.user.delete({
