@@ -44,6 +44,16 @@ app.delete('/user/:id', async (req:Request, res:Response) => {
     res.json(user)
 })
 
+app.post('/table', async (req:Request, res:Response) => {
+    const {users} = req.body;
+    const table = await prisma.table.create({
+        data:{
+            users,
+        }
+    })
+    res.json(table)
+})
+
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`)
 })
