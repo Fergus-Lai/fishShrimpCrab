@@ -9,9 +9,9 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT;
 app.get('/', (req, res) => {
-    res.send('Express + TypeScript Server');
+    res.send('Test');
 });
 app.listen(port, () => {
-    console.log(`Server running at https://localhost:${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });
 //# sourceMappingURL=index.js.map
