@@ -15,6 +15,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
+function userById(id) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            return yield prisma.user.findUniqueOrThrow({
+                where: {
+                    id,
+                }
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
+    });
+}
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
@@ -50,6 +64,90 @@ app.delete('/user/:id', (req, res) => __awaiter(void 0, void 0, void 0, function
         }
     });
     res.json(user);
+}));
+app.get('/tables', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tables = yield prisma.table.findMany();
+    res.json(tables);
+}));
+app.get('/table/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const table = yield prisma.table.findUnique({
+        where: { id: parseInt(id), },
+        include: { users: true }
+    });
+    res.json(table);
+}));
+app.post('/table', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { users } = req.body;
+    let table = yield prisma.table.create({ data: {} });
+    for (let i = 0; i < users.length; i++) {
+        try {
+            let user = yield prisma.user.update({
+                where: { id: users[i] },
+                data: { tableID: table.id }
+            });
+        }
+        catch (error) {
+            console.log(error);
+        }
+    }
+    try {
+        table = yield prisma.table.findUniqueOrThrow({ where: { id: table.id } });
+    }
+    catch (error) {
+        console.log(error);
+    }
+    res.json(table);
+}));
+app.put('/table/enter', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { tableID, user } = req.body;
+    let userUpdate;
+    try {
+        userUpdate = yield prisma.user.update({
+            where: {
+                id: user,
+            },
+            data: {
+                tableID: parseInt(tableID),
+            }
+        });
+    }
+    catch (error) {
+        console.log(error);
+        userUpdate = error;
+    }
+    res.json(userUpdate);
+}));
+app.put('/table/leave', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { tableID, user } = req.body;
+    let userUpdate;
+    try {
+        userUpdate = yield prisma.user.update({
+            where: {
+                id: user,
+            },
+            data: {
+                tableID: null,
+            }
+        });
+    }
+    catch (error) {
+        console.log(error);
+        userUpdate = error;
+    }
+    try {
+        const table = yield prisma.table.findUniqueOrThrow({
+            where: { id: parseInt(tableID) },
+            include: { users: true }
+        });
+        if (table.users.length == 0) {
+            yield prisma.table.delete({ where: { id: parseInt(tableID) } });
+        }
+    }
+    catch (error) {
+        console.log(error);
+    }
+    res.json(userUpdate);
 }));
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
