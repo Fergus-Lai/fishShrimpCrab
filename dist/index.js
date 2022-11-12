@@ -15,20 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
 const socket_io_1 = require("socket.io");
-function userById(id) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            return yield prisma.user.findUniqueOrThrow({
-                where: {
-                    id,
-                },
-            });
-        }
-        catch (error) {
-            console.log(error);
-        }
-    });
-}
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
 const port = parseInt(process.env.PORT || "4000");
@@ -40,7 +26,6 @@ io.on("connection", (socket) => {
         let userName = data.name;
         let code = data.code;
         let icon = data.icon;
-        let noDupTable = true;
         try {
             yield prisma.table.create({
                 data: {

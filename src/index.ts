@@ -15,7 +15,6 @@ io.on("connection", (socket) => {
     let userName: string = data.name;
     let code: string = data.code;
     let icon: string = data.icon;
-    let noDupTable = true;
     try {
       await prisma.table.create({
         data: {
