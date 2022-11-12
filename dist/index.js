@@ -58,6 +58,36 @@ io.on("connection", (socket) => {
         socket.emit("created");
         return;
     }));
+    socket.on("joinTable", (data) => __awaiter(void 0, void 0, void 0, function* () {
+        let userName = data.name;
+        let code = data.code;
+        let icon = data.icon;
+        try {
+            yield prisma.table.findUniqueOrThrow({ where: { id: code } });
+            yield prisma.user.upsert({
+                where: {
+                    id: socket.id,
+                },
+                update: {
+                    userName,
+                    money: 1000,
+                    tableID: code,
+                    icon,
+                },
+                create: {
+                    id: socket.id,
+                    userName,
+                    money: 1000,
+                    tableID: code,
+                    icon,
+                },
+            });
+            socket.emit("joined");
+        }
+        catch (e) {
+            socket.emit("noTable");
+        }
+    }));
     socket.on("disconnect", () => __awaiter(void 0, void 0, void 0, function* () {
         try {
             yield prisma.user.delete({ where: { id: socket.id } });
