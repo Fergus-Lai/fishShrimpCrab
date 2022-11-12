@@ -12,16 +12,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const client_1 = require("@prisma/client");
+const socket_io_1 = require("socket.io");
 function userById(id) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield prisma.user.findUniqueOrThrow({
                 where: {
                     id,
-                }
+                },
             });
         }
         catch (error) {
@@ -31,125 +31,53 @@ function userById(id) {
 }
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
-const app = (0, express_1.default)();
-const port = process.env.PORT;
-app.use(express_1.default.json());
-app.post('/user', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userName, email, password } = req.body;
-    const money = 1000;
-    const user = yield prisma.user.create({
-        data: {
-            userName,
-            email,
-            password,
-            money,
-        }
-    });
-    res.json(user);
-}));
-app.get('/user/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const user = yield prisma.user.findUnique({
-        where: {
-            id,
-        }
-    });
-    res.json(user);
-}));
-app.delete('/user/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const user = yield prisma.user.delete({
-        where: {
-            id,
-        }
-    });
-    res.json(user);
-}));
-app.get('/tables', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const tables = yield prisma.table.findMany();
-    res.json(tables);
-}));
-app.get('/table/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const table = yield prisma.table.findUnique({
-        where: { id: parseInt(id), },
-        include: { users: true }
-    });
-    res.json(table);
-}));
-app.post('/table', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { users } = req.body;
-    let table = yield prisma.table.create({ data: {} });
-    for (let i = 0; i < users.length; i++) {
+const port = parseInt(process.env.PORT || "4000");
+const io = new socket_io_1.Server(port, {
+    cors: { origin: "http://localhost:3001" },
+});
+io.on("connection", (socket) => {
+    socket.on("createTable", (data) => __awaiter(void 0, void 0, void 0, function* () {
+        let userName = data.name;
+        let code = data.code;
+        let icon = data.icon;
+        let noDupTable = true;
         try {
-            let user = yield prisma.user.update({
-                where: { id: users[i] },
-                data: { tableID: table.id }
+            yield prisma.table.create({
+                data: {
+                    id: code,
+                },
             });
         }
         catch (error) {
-            console.log(error);
+            socket.emit("table_duplicate");
+            return;
         }
-    }
-    try {
-        table = yield prisma.table.findUniqueOrThrow({ where: { id: table.id } });
-    }
-    catch (error) {
-        console.log(error);
-    }
-    res.json(table);
-}));
-app.put('/table/enter', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { tableID, user } = req.body;
-    let userUpdate;
-    try {
-        userUpdate = yield prisma.user.update({
+        yield prisma.user.upsert({
             where: {
-                id: user,
+                id: socket.id,
             },
-            data: {
-                tableID: parseInt(tableID),
-            }
-        });
-    }
-    catch (error) {
-        console.log(error);
-        userUpdate = error;
-    }
-    res.json(userUpdate);
-}));
-app.put('/table/leave', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { tableID, user } = req.body;
-    let userUpdate;
-    try {
-        userUpdate = yield prisma.user.update({
-            where: {
-                id: user,
+            update: {
+                userName,
+                money: 1000,
+                tableID: code,
+                icon,
             },
-            data: {
-                tableID: null,
-            }
+            create: {
+                id: socket.id,
+                userName,
+                money: 1000,
+                tableID: code,
+                icon,
+            },
         });
-    }
-    catch (error) {
-        console.log(error);
-        userUpdate = error;
-    }
-    try {
-        const table = yield prisma.table.findUniqueOrThrow({
-            where: { id: parseInt(tableID) },
-            include: { users: true }
-        });
-        if (table.users.length == 0) {
-            yield prisma.table.delete({ where: { id: parseInt(tableID) } });
+        socket.emit("created");
+        return;
+    }));
+    socket.on("disconnect", () => __awaiter(void 0, void 0, void 0, function* () {
+        try {
+            yield prisma.user.delete({ where: { id: socket.id } });
         }
-    }
-    catch (error) {
-        console.log(error);
-    }
-    res.json(userUpdate);
-}));
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+        catch (e) { }
+    }));
 });
 //# sourceMappingURL=index.js.map
