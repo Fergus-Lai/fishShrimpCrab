@@ -12,6 +12,7 @@ const io: Server = new Server(port, {
 
 io.on("connection", (socket) => {
   socket.on("createTable", async (data) => {
+    let id: string = data.userId;
     let userName: string = data.name;
     let code: string = data.code;
     let icon: string = data.icon;
@@ -27,7 +28,7 @@ io.on("connection", (socket) => {
     }
     await prisma.user.upsert({
       where: {
-        id: socket.id,
+        id,
       },
       update: {
         userName,
@@ -36,7 +37,7 @@ io.on("connection", (socket) => {
         icon,
       },
       create: {
-        id: socket.id,
+        id,
         userName,
         money: 1000,
         tableID: code,
@@ -47,7 +48,32 @@ io.on("connection", (socket) => {
     return;
   });
 
+  socket.on("loaded", async (data) => {
+    let userId = data.userId;
+    let id = data.id;
+    try {
+      let table = await prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { table: true },
+      });
+      if (!table.table) {
+        throw "Table not found";
+      }
+      if (table.table.id !== id) {
+        throw "Table id dont match";
+      }
+      socket.join(data.code);
+    } catch (e) {
+      if (e === "Table id dont match") {
+        socket.emit("tableIdNotMatch");
+      } else {
+        socket.emit("tableNotFound");
+      }
+    }
+  });
+
   socket.on("joinTable", async (data) => {
+    let id: string = data.userId;
     let userName: string = data.name;
     let code: string = data.code;
     let icon: string = data.icon;
@@ -55,7 +81,7 @@ io.on("connection", (socket) => {
       await prisma.table.findUniqueOrThrow({ where: { id: code } });
       await prisma.user.upsert({
         where: {
-          id: socket.id,
+          id,
         },
         update: {
           userName,
@@ -64,7 +90,7 @@ io.on("connection", (socket) => {
           icon,
         },
         create: {
-          id: socket.id,
+          id,
           userName,
           money: 1000,
           tableID: code,
@@ -76,10 +102,5 @@ io.on("connection", (socket) => {
       socket.emit("noTable");
     }
   });
-
-  socket.on("disconnect", async () => {
-    try {
-      await prisma.user.delete({ where: { id: socket.id } });
-    } catch (e) {}
-  });
+  socket.on;
 });

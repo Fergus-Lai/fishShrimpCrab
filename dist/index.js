@@ -23,6 +23,7 @@ const io = new socket_io_1.Server(port, {
 });
 io.on("connection", (socket) => {
     socket.on("createTable", (data) => __awaiter(void 0, void 0, void 0, function* () {
+        let id = data.userId;
         let userName = data.name;
         let code = data.code;
         let icon = data.icon;
@@ -39,7 +40,7 @@ io.on("connection", (socket) => {
         }
         yield prisma.user.upsert({
             where: {
-                id: socket.id,
+                id,
             },
             update: {
                 userName,
@@ -48,7 +49,7 @@ io.on("connection", (socket) => {
                 icon,
             },
             create: {
-                id: socket.id,
+                id,
                 userName,
                 money: 1000,
                 tableID: code,
@@ -58,7 +59,33 @@ io.on("connection", (socket) => {
         socket.emit("created");
         return;
     }));
+    socket.on("loaded", (data) => __awaiter(void 0, void 0, void 0, function* () {
+        let userId = data.userId;
+        let id = data.id;
+        try {
+            let table = yield prisma.user.findUniqueOrThrow({
+                where: { id: userId },
+                select: { table: true },
+            });
+            if (!table.table) {
+                throw "Table not found";
+            }
+            if (table.table.id !== id) {
+                throw "Table id dont match";
+            }
+            socket.join(data.code);
+        }
+        catch (e) {
+            if (e === "Table id dont match") {
+                socket.emit("tableIdNotMatch");
+            }
+            else {
+                socket.emit("tableNotFound");
+            }
+        }
+    }));
     socket.on("joinTable", (data) => __awaiter(void 0, void 0, void 0, function* () {
+        let id = data.userId;
         let userName = data.name;
         let code = data.code;
         let icon = data.icon;
@@ -66,7 +93,7 @@ io.on("connection", (socket) => {
             yield prisma.table.findUniqueOrThrow({ where: { id: code } });
             yield prisma.user.upsert({
                 where: {
-                    id: socket.id,
+                    id,
                 },
                 update: {
                     userName,
@@ -75,7 +102,7 @@ io.on("connection", (socket) => {
                     icon,
                 },
                 create: {
-                    id: socket.id,
+                    id,
                     userName,
                     money: 1000,
                     tableID: code,
@@ -88,11 +115,6 @@ io.on("connection", (socket) => {
             socket.emit("noTable");
         }
     }));
-    socket.on("disconnect", () => __awaiter(void 0, void 0, void 0, function* () {
-        try {
-            yield prisma.user.delete({ where: { id: socket.id } });
-        }
-        catch (e) { }
-    }));
+    socket.on;
 });
 //# sourceMappingURL=index.js.map
