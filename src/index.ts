@@ -7,8 +7,14 @@ dotenv.config();
 const prisma: PrismaClient = new PrismaClient();
 const port = parseInt(process.env.PORT || "4000");
 const io: Server = new Server(port, {
-  cors: { origin: "http://localhost:8080" },
+  cors: {
+    origin: ["http://localhost:8080"],
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
 });
+
+console.log(port);
 
 io.on("connection", (socket) => {
   socket.on("createTable", async (data) => {
@@ -107,7 +113,9 @@ io.on("connection", (socket) => {
       }
       socket.to(user.tableID).emit("player_left", user.id);
       setTimeout(async () => {
-        await prisma.user.delete({ where: { id: user.id } });
+        try {
+          await prisma.user.delete({ where: { id: user.id } });
+        } catch (error) {}
       }, 300000);
     } catch (e) {}
   });
