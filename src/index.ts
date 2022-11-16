@@ -7,7 +7,7 @@ dotenv.config();
 const prisma: PrismaClient = new PrismaClient();
 const port = parseInt(process.env.PORT || "4000");
 const io: Server = new Server(port, {
-  cors: { origin: "http://localhost:3001" },
+  cors: { origin: "http://localhost:8080" },
 });
 
 io.on("connection", (socket) => {
@@ -31,12 +31,14 @@ io.on("connection", (socket) => {
         id,
       },
       update: {
+        socket: socket.id,
         userName,
         money: 1000,
         tableID: code,
         icon,
       },
       create: {
+        socket: socket.id,
         id,
         userName,
         money: 1000,
@@ -48,21 +50,42 @@ io.on("connection", (socket) => {
     return;
   });
 
-  socket.on("loaded", async (data) => {
+  socket.on("loading", async (data) => {
     let userId = data.userId;
     let id = data.id;
     try {
-      let table = await prisma.user.findUniqueOrThrow({
+      let user = await prisma.user.findUniqueOrThrow({
         where: { id: userId },
-        select: { table: true },
+        include: { table: true },
       });
-      if (!table.table) {
+      if (!user.table) {
         throw "Table not found";
       }
-      if (table.table.id !== id) {
+      if (user.table.id !== id) {
         throw "Table id dont match";
       }
+      await prisma.user.update({
+        where: { id: userId },
+        data: { socket: socket.id },
+      });
+      let users = await prisma.user.findMany({
+        where: { tableID: id, NOT: { id: userId } },
+        select: { id: true, userName: true, money: true },
+      });
+
       socket.join(data.code);
+      socket.emit("loaded", {
+        money: user.money,
+        icon: user.icon,
+        username: user.userName,
+        users: users,
+      });
+      socket.to(data.code).emit("playerJoined", {
+        id: user.id,
+        money: user.money,
+        icon: user.icon,
+        username: user.userName,
+      });
     } catch (e) {
       if (e === "Table id dont match") {
         socket.emit("tableIdNotMatch");
@@ -72,6 +95,25 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("disconnect", async (reason) => {
+    try {
+      let user = await prisma.user.findFirstOrThrow({
+        where: { socket: socket.id },
+        select: { id: true, tableID: true },
+      });
+      if (!user.tableID) {
+        await prisma.user.delete({ where: { id: user.id } });
+        return;
+      }
+      socket.to(user.tableID).emit("player_left", user.id);
+      setTimeout(async () => {
+        await prisma.user.delete({ where: { id: user.id } });
+      }, 300000);
+    } catch (e) {}
+  });
+
+  socket.on("bet", async (data) => {});
+
   socket.on("joinTable", async (data) => {
     let id: string = data.userId;
     let userName: string = data.name;
@@ -79,28 +121,40 @@ io.on("connection", (socket) => {
     let icon: string = data.icon;
     try {
       await prisma.table.findUniqueOrThrow({ where: { id: code } });
-      await prisma.user.upsert({
-        where: {
-          id,
-        },
-        update: {
-          userName,
-          money: 1000,
-          tableID: code,
-          icon,
-        },
-        create: {
-          id,
-          userName,
-          money: 1000,
-          tableID: code,
-          icon,
-        },
+      let user = await prisma.user.findUnique({
+        where: { id },
+        select: { tableID: true },
       });
+      if (user && user.tableID === code) {
+        prisma.user.update({
+          where: { id },
+          data: { socket: socket.id, userName, icon },
+        });
+      } else {
+        await prisma.user.upsert({
+          where: {
+            id,
+          },
+          update: {
+            socket: socket.id,
+            userName,
+            money: 1000,
+            tableID: code,
+            icon,
+          },
+          create: {
+            socket: socket.id,
+            id,
+            userName,
+            money: 1000,
+            tableID: code,
+            icon,
+          },
+        });
+      }
       socket.emit("joined");
     } catch (e) {
       socket.emit("noTable");
     }
   });
-  socket.on;
 });

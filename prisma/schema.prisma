@@ -12,6 +12,7 @@ datasource db {
 
 model User {
   id       String  @id
+  socket   String
   userName String  @db.VarChar(13)
   money    Int
   bets     Bets[]
