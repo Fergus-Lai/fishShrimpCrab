@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 
 dotenv.config();
 
+//  Create Prisma and Server
 const prisma: PrismaClient = new PrismaClient();
 const port = parseInt(process.env.PORT || "4000");
 const io: Server = new Server(port, {
@@ -14,27 +15,30 @@ const io: Server = new Server(port, {
   },
 });
 
+// Log Port When Server Running
 console.log(port);
 
+// Handle Socket Connection Events
 io.on("connection", (socket) => {
+  // Create Table Request
   socket.on("createTable", async (data) => {
-    let id: string = data.userId;
-    let userName: string = data.name;
-    let code: string = data.code;
-    let icon: string = data.icon;
+    let { userId, userName, code, icon } = data;
+    //  Create Table
     try {
       await prisma.table.create({
         data: {
           id: code,
         },
       });
+      // Table Already Exists
     } catch (error) {
-      socket.emit("table_duplicate");
+      socket.emit("tableDuplicate");
       return;
     }
+    // Update Or Create User
     await prisma.user.upsert({
       where: {
-        id,
+        id: userId,
       },
       update: {
         socket: socket.id,
@@ -45,47 +49,58 @@ io.on("connection", (socket) => {
       },
       create: {
         socket: socket.id,
-        id,
+        id: userId,
         userName,
         money: 1000,
         tableID: code,
         icon,
       },
     });
-    socket.emit("created");
+    // Send Response of joined
+    socket.emit("joined");
     return;
   });
 
+  // Handle Loading of The Board Page
   socket.on("loading", async (data) => {
-    let userId = data.userId;
-    let id = data.id;
+    let { userId, id } = data;
     try {
+      // Search For User
       let user = await prisma.user.findUniqueOrThrow({
         where: { id: userId },
         include: { table: true },
       });
+      // If There Are No Table Field
       if (!user.table) {
         throw "Table not found";
       }
+      // If Table Field != Code Recevied
       if (user.table.id !== id) {
         throw "Table id dont match";
       }
+      // Update Socket Id
       await prisma.user.update({
         where: { id: userId },
         data: { socket: socket.id },
       });
+      // Get List Of Other Users In The Table
       let users = await prisma.user.findMany({
         where: { tableID: id, NOT: { id: userId } },
         select: { id: true, userName: true, money: true },
       });
 
+      // Join Table
       socket.join(data.code);
+
+      // Emit The Loaded Event to The Player
       socket.emit("loaded", {
         money: user.money,
         icon: user.icon,
         username: user.userName,
         users: users,
       });
+
+      // Emit Player Joined Event To All Player in Table
       socket.to(data.code).emit("playerJoined", {
         id: user.id,
         money: user.money,
@@ -95,23 +110,30 @@ io.on("connection", (socket) => {
     } catch (e) {
       if (e === "Table id dont match") {
         socket.emit("tableIdNotMatch");
-      } else {
+      } else if (e === "Table not found") {
         socket.emit("tableNotFound");
+      } else {
+        socket.emit("userNotFound");
       }
     }
   });
 
+  // Handle socket disconnect
   socket.on("disconnect", async (reason) => {
     try {
+      // Search For User with The Same Socket Id
       let user = await prisma.user.findFirstOrThrow({
         where: { socket: socket.id },
         select: { id: true, tableID: true },
       });
+      // Delete User If User Not In A Table
       if (!user.tableID) {
         await prisma.user.delete({ where: { id: user.id } });
         return;
       }
-      socket.to(user.tableID).emit("player_left", user.id);
+      socket.leave(user.tableID);
+      // Emit to Player in Table The User Left
+      socket.to(user.tableID).emit("playerLeft", user.id);
       setTimeout(async () => {
         try {
           await prisma.user.delete({ where: { id: user.id } });
@@ -122,30 +144,32 @@ io.on("connection", (socket) => {
 
   socket.on("bet", async (data) => {});
 
+  // Handle join table
   socket.on("joinTable", async (data) => {
-    let id: string = data.userId;
-    let userName: string = data.name;
-    let code: string = data.code;
-    let icon: string = data.icon;
+    let { id, name, code, icon } = data;
     try {
+      // Search If Table Of Code Exists
       await prisma.table.findUniqueOrThrow({ where: { id: code } });
+      // Get User If Exists Or None
       let user = await prisma.user.findUnique({
         where: { id },
         select: { tableID: true },
       });
+      // If User Exists and The TableID Is Equal To The Input Code, Only Update The Username, Icon and Socket
       if (user && user.tableID === code) {
         prisma.user.update({
           where: { id },
-          data: { socket: socket.id, userName, icon },
+          data: { socket: socket.id, userName: name, icon },
         });
       } else {
+        // Update Or Create User
         await prisma.user.upsert({
           where: {
             id,
           },
           update: {
             socket: socket.id,
-            userName,
+            userName: name,
             money: 1000,
             tableID: code,
             icon,
@@ -153,7 +177,7 @@ io.on("connection", (socket) => {
           create: {
             socket: socket.id,
             id,
-            userName,
+            userName: name,
             money: 1000,
             tableID: code,
             icon,
