@@ -15,9 +15,6 @@ const io: Server = new Server(port, {
   },
 });
 
-// Log Port When Server Running
-console.log(port);
-
 // Handle Socket Connection Events
 io.on("connection", (socket) => {
   // Create Table Request
@@ -86,11 +83,8 @@ io.on("connection", (socket) => {
       // Get List Of Other Users In The Table
       let users = await prisma.user.findMany({
         where: { tableID: id, NOT: { id: userId } },
-        select: { id: true, userName: true, money: true },
+        select: { id: true, userName: true, icon: true, money: true },
       });
-
-      // Join Table
-      socket.join(data.code);
 
       // Emit The Loaded Event to The Player
       socket.emit("loaded", {
@@ -101,12 +95,15 @@ io.on("connection", (socket) => {
       });
 
       // Emit Player Joined Event To All Player in Table
-      socket.to(data.code).emit("playerJoined", {
+      socket.to(id).emit("playerJoined", {
         id: user.id,
-        money: user.money,
-        icon: user.icon,
         username: user.userName,
+        icon: user.icon,
+        money: user.money,
       });
+
+      // Join Table
+      socket.join(id);
     } catch (e) {
       if (e === "Table id dont match") {
         socket.emit("tableIdNotMatch");
@@ -119,7 +116,7 @@ io.on("connection", (socket) => {
   });
 
   // Handle socket disconnect
-  socket.on("disconnect", async (reason) => {
+  socket.on("disconnecting", async (reason) => {
     try {
       // Search For User with The Same Socket Id
       let user = await prisma.user.findFirstOrThrow({
@@ -131,9 +128,8 @@ io.on("connection", (socket) => {
         await prisma.user.delete({ where: { id: user.id } });
         return;
       }
-      socket.leave(user.tableID);
-      // Emit to Player in Table The User Left
-      socket.to(user.tableID).emit("playerLeft", user.id);
+      // console.log(await io.in(user.tableID).fetchSockets());
+      socket.to(user.tableID).emit("playerLeft", { id: user.id });
       setTimeout(async () => {
         try {
           await prisma.user.delete({ where: { id: user.id } });
@@ -146,38 +142,38 @@ io.on("connection", (socket) => {
 
   // Handle join table
   socket.on("joinTable", async (data) => {
-    let { id, name, code, icon } = data;
+    let { userId, userName, code, icon } = data;
     try {
       // Search If Table Of Code Exists
       await prisma.table.findUniqueOrThrow({ where: { id: code } });
       // Get User If Exists Or None
       let user = await prisma.user.findUnique({
-        where: { id },
+        where: { id: userId },
         select: { tableID: true },
       });
       // If User Exists and The TableID Is Equal To The Input Code, Only Update The Username, Icon and Socket
       if (user && user.tableID === code) {
         prisma.user.update({
-          where: { id },
-          data: { socket: socket.id, userName: name, icon },
+          where: { id: userId },
+          data: { socket: socket.id, userName, icon },
         });
       } else {
         // Update Or Create User
         await prisma.user.upsert({
           where: {
-            id,
+            id: userId,
           },
           update: {
             socket: socket.id,
-            userName: name,
+            userName,
             money: 1000,
             tableID: code,
             icon,
           },
           create: {
             socket: socket.id,
-            id,
-            userName: name,
+            id: userId,
+            userName,
             money: 1000,
             tableID: code,
             icon,
@@ -190,3 +186,5 @@ io.on("connection", (socket) => {
     }
   });
 });
+// Log Port When Server Running
+console.log(port);
