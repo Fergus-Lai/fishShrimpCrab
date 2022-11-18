@@ -67,10 +67,10 @@ io.on("connection", (socket) => {
     socket.emit("joined");
 
     // Interval For Dice Roll
-    inetrvals[code] = setInterval(() => {
-      roll();
-    }, 90000);
-    return;
+    // inetrvals[code] = setInterval(() => {
+    //   roll();
+    // }, 90000);
+    // return;
   });
 
   // Handle Loading of The Board Page
