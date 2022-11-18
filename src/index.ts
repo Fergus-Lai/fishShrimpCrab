@@ -14,6 +14,15 @@ const io: Server = new Server(port, {
     credentials: true,
   },
 });
+let inetrvals: { [key: string]: ReturnType<typeof setInterval> } = {};
+
+// Roll Function
+function roll() {
+  let rolls = [];
+  for (let i = 0; i < 3; i++) {
+    rolls.push(Math.floor(Math.random() * 6) + 1);
+  }
+}
 
 // Handle Socket Connection Events
 io.on("connection", (socket) => {
@@ -25,6 +34,7 @@ io.on("connection", (socket) => {
       await prisma.table.create({
         data: {
           id: code,
+          time: new Date(),
         },
       });
       // Table Already Exists
@@ -55,6 +65,11 @@ io.on("connection", (socket) => {
     });
     // Send Response of joined
     socket.emit("joined");
+
+    // Interval For Dice Roll
+    inetrvals[code] = setInterval(() => {
+      roll();
+    }, 90000);
     return;
   });
 

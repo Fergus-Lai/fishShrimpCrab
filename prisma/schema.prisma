@@ -22,7 +22,8 @@ model User {
 }
 
 model Table {
-  id    String @id
+  id    String   @id
+  time  DateTime
   users User[]
   bets  Bets[]
 }
