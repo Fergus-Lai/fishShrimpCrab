@@ -123,15 +123,19 @@ io.on("connection", (socket) => {
         where: { socket: socket.id },
         select: { id: true, tableID: true },
       });
-      // Delete User If User Not In A Table
       if (!user.tableID) {
-        await prisma.user.delete({ where: { id: user.id } });
         return;
       }
-      // console.log(await io.in(user.tableID).fetchSockets());
+      let table = await prisma.table.findUniqueOrThrow({
+        where: { id: user.tableID },
+        select: { id: true, users: true },
+      });
       socket.to(user.tableID).emit("playerLeft", { id: user.id });
       setTimeout(async () => {
         try {
+          if (table.users.length === 1) {
+            await prisma.table.delete({ where: { id: table.id } });
+          }
           await prisma.user.delete({ where: { id: user.id } });
         } catch (error) {}
       }, 300000);
